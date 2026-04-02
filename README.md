@@ -1,1 +1,1 @@
-# tfg_Chatbot_para_gesti-n_de_clinicas_privadas
+# tfg_Chatbot_para_gestion_de_clinicas_privadas
