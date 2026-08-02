@@ -1,0 +1,7 @@
+services:
+  telegram-bot:
+    build: .
+    container_name: chatbot_clinica_telegram
+    restart: always
+    environment:
+      - ./.env
