@@ -76,14 +76,22 @@ def create_application(token: str) -> Application:
 
 def main() -> None:
     """Punto de entrada principal para iniciar el bot."""
-    # El token se obtiene prioritariamente de las variables de entorno
-    token = os.getenv("TELEGRAM_BOT_TOKEN", "TU_TOKEN_AQUI")
+    # Intentar cargar variables de entorno desde el archivo .env si existe
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
-    if token == "TU_TOKEN_AQUI":
-        logger.warning(
-            "⚠️ No se ha encontrado la variable de entorno TELEGRAM_BOT_TOKEN. "
-            "Configura esa variable de entorno o reemplaza 'TU_TOKEN_AQUI' con el token real proporcionado por BotFather."
+    # El token se obtiene prioritariamente de las variables de entorno
+    token = os.getenv("DOCTOR_BOT_TOKEN", "NOT_FOUND")
+
+    if token == "NOT_FOUND" or not token:
+        logger.error(
+            "No se ha encontrado la variable de entorno DOCTOR_BOT_TOKEN. "
+            "Configura esa variable de entorno en tu archivo .env o en el sistema."
         )
+        return
 
     logger.info("Iniciando el bot de Telegram...")
     application = create_application(token)
