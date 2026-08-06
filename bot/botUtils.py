@@ -9,6 +9,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from database import db
 
 # Configuración de logging
 logging.basicConfig(
@@ -36,7 +37,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     help_text = (
         "📌 *Comandos disponibles:*\n"
         "/start - Iniciar interacción con el bot\n"
-        "/help - Mostrar este mensaje de ayuda"
+        "/help - Mostrar este mensaje de ayuda\n"
+        "/resumen <id_doctor> - Obtener el resumen de las conversaciones de un doctor"
     )
     if update.message:
         await update.message.reply_text(help_text, parse_mode="Markdown")
@@ -45,6 +47,44 @@ async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Responde a los mensajes de texto habituales del usuario."""
     if update.message and update.message.text:
         await update.message.reply_text(f"Has dicho: {update.message.text}")
+
+async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja el comando /resumen."""
+    if not context.args:
+        if update.message:
+            await update.message.reply_text("Por favor, proporciona el ID del doctor. Uso: /resumen <id_doctor>")
+        return
+
+    try:
+        doctor_id = int(context.args[0])
+    except ValueError:
+        if update.message:
+            await update.message.reply_text("El ID del doctor debe ser un número entero.")
+        return
+
+    if update.message:
+        await update.message.reply_text("Consultando resúmenes...")
+    
+    resumenes = await db.get_resumenes_doctor(doctor_id)
+    
+    if resumenes is None:
+        if update.message:
+            await update.message.reply_text("Ocurrió un error al consultar la base de datos.")
+        return
+    
+    if not resumenes:
+        if update.message:
+            await update.message.reply_text(f"No se encontraron resúmenes para el doctor con ID {doctor_id}.")
+        return
+
+    respuesta = f"📄 *Resúmenes del Doctor ID {doctor_id}:*\n\n"
+    for r in resumenes:
+        respuesta += f"- *Paciente:* {r['paciente_nombre']} ({r['paciente_telefono']})\n"
+        respuesta += f"  *Resumen:* {r['resumen']}\n"
+        respuesta += f"  *Fecha:* {r['created_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
+
+    if update.message:
+        await update.message.reply_text(respuesta, parse_mode="Markdown")
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja los errores ocurridos durante la ejecución del bot."""
@@ -65,6 +105,7 @@ def create_application(token: str) -> Application:
     # Registrar handlers de comandos
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("resumen", get_resumen_command))
     
     # Registrar handler de mensajes de texto
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_message))
