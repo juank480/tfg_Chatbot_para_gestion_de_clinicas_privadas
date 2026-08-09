@@ -2,7 +2,7 @@
 
 ## Verificación Manual de instalación
 
-Para ponerlo en marcha, necesitas ejecutar un par de pasos en tu máquina:
+Para ponerlo en marcha, necesitas ejecutar los siguientes pasos en tu máquina:
 
 > [!NOTE]
 > **Paso 1: Configurar el Token**
