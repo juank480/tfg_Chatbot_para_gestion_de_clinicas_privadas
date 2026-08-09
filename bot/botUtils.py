@@ -77,7 +77,7 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(f"No se encontraron resúmenes para el doctor con ID {doctor_id}.")
         return
 
-    respuesta = f"📄 *Resúmenes del Doctor ID {doctor_id}:*\n\n"
+    respuesta = f" *Resúmenes del Doctor ID {doctor_id}:*\n\n"
     for r in resumenes:
         respuesta += f"- *Paciente:* {r['paciente_nombre']} ({r['paciente_telefono']})\n"
         respuesta += f"  *Resumen:* {r['resumen']}\n"
@@ -119,7 +119,7 @@ def main() -> None:
     """Punto de entrada principal para iniciar el bot."""
     # Intentar cargar variables de entorno desde el archivo .env si existe
     try:
-        from dotenv import load_dotenv
+        from dotenv import load_dotenv # type: ignore
         load_dotenv()
     except ImportError:
         pass

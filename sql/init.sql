@@ -36,7 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_conversacion_persona ON conversacion(persona_id);
 CREATE INDEX IF NOT EXISTS idx_conversacion_doctor ON conversacion(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_mensaje_conversacion ON mensaje(conversacion_id);
 
--- Vista para obtener fácilmente el resumen de un doctor (simulando Doctor.getResumen())
+-- Vista para obtener fácilmente el resumen de un doctor Doctor.getResumen()
 CREATE OR REPLACE VIEW vista_resumenes_doctor AS
 SELECT 
     c.doctor_id,

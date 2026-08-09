@@ -11,6 +11,15 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  ollama:
+    image: ollama/ollama
+    container_name: chatbot_clinica_ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
   telegram-bot:
     build: ./bot
     container_name: chatbot_clinica_telegram
@@ -20,5 +29,18 @@ services:
     depends_on:
       - db
 
+  telegram-bot-paciente:
+    build: ./bot
+    container_name: chatbot_clinica_telegram_paciente
+    restart: always
+    command: ["python", "paciente_bot.py"]
+    env_file:
+      - .env
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+
 volumes:
   postgres_data:
+  ollama_data:
