@@ -38,7 +38,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     ]
     
     welcome_message = (
-        f"¡Hola {user_name}! 👋\n"
+        f"¡Hola {user_name}!\n"
         "Soy el asistente virtual de la clínica. Estoy aquí para tomar nota de tus síntomas "
         "y ayudarte a concertar una cita con el doctor. ¿En qué te puedo ayudar hoy?"
     )
@@ -67,7 +67,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
 
     ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-    model_name = os.getenv("OLLAMA_MODEL", "mistral")
+    model_name = os.getenv("OLLAMA_MODEL", "llama3.1")
     
     # Enviar estado de "Escribiendo..."
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
