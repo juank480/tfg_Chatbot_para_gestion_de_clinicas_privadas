@@ -92,10 +92,14 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     respuesta = f" *Resúmenes de Pacientes:*\n\n"
     for r in resumenes:
+        cita = r['cita_medica_fecha'].strftime('%Y-%m-%d %H:%M') if r['cita_medica_fecha'] else "Pendiente de asignar"
+        icono = "🔴 (Abandono)" if r['estado'] == 'CANCELADA' else "🟢 (Completado)"
         respuesta += f"- *Paciente:* {r['paciente_nombre']} (Tel: {r['paciente_telefono']})\n"
         respuesta += f"  *Telegram ID:* `{r['paciente_telegram_id']}` | *Chat ID:* `{r['conversacion_id']}`\n"
+        respuesta += f"  *Estado Triaje:* {icono}\n"
+        respuesta += f"  *Cita Médica:* {cita}\n"
         respuesta += f"  *Resumen:* {r['resumen']}\n"
-        respuesta += f"  *Fecha:* {r['created_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
+        respuesta += f"  *Fecha Registro:* {r['created_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
 
     if update.message:
         await update.message.reply_text(respuesta, parse_mode="Markdown")

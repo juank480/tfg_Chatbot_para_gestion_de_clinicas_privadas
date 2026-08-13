@@ -102,18 +102,32 @@ class Database:
             logger.error(f"Error en obtener_historial_mensajes: {e}")
             return []
 
-    async def cerrar_conversacion(self, conversacion_id: int, resumen: str):
+    async def cerrar_conversacion(self, conversacion_id: int, resumen: str, estado: str = 'CERRADA'):
         if not self.pool: await self.connect()
         try:
             async with self.pool.acquire() as conn:
                 query = """
                     UPDATE conversacion 
-                    SET resumen = $1, estado = 'CERRADA', updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $2;
+                    SET resumen = $1, estado = $2, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $3;
                 """
-                await conn.execute(query, resumen, conversacion_id)
+                await conn.execute(query, resumen, estado, conversacion_id)
         except Exception as e:
             logger.error(f"Error en cerrar_conversacion: {e}")
+
+    async def cancelar_conversaciones_abiertas(self, persona_id: int):
+        """Cancela cualquier conversación que estuviera a medias para este usuario."""
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                query = """
+                    UPDATE conversacion 
+                    SET estado = 'CANCELADA', updated_at = CURRENT_TIMESTAMP
+                    WHERE persona_id = $1 AND estado = 'ABIERTA';
+                """
+                await conn.execute(query, persona_id)
+        except Exception as e:
+            logger.error(f"Error al cancelar conversaciones abiertas: {e}")
 
     async def get_resumenes_doctor(self, doctor_id: int):
         """
@@ -131,13 +145,17 @@ class Database:
                         p.nombre AS paciente_nombre, 
                         COALESCE(p.telefono, 'No facilitado') AS paciente_telefono, 
                         c.resumen, 
+                        c.estado,
+                        c.cita_medica_fecha,
                         c.created_at
                     FROM 
                         conversacion c
                     JOIN 
                         persona p ON c.persona_id = p.id
                     WHERE 
-                        c.estado = 'CERRADA' AND c.resumen IS NOT NULL
+                        c.estado IN ('CERRADA', 'CANCELADA') 
+                        AND c.resumen IS NOT NULL
+                        AND c.updated_at >= CURRENT_DATE
                     ORDER BY 
                         c.updated_at DESC;
                 """

@@ -33,7 +33,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user_name = update.effective_user.first_name if update.effective_user else "paciente"
     user_id = update.effective_user.id
     
-    await db.get_or_create_persona(user_id, user_name)
+    persona_id = await db.get_or_create_persona(user_id, user_name)
+    
+    # Si el usuario hace /start, cancelamos cualquier triaje que tuviera a medias
+    # para forzar al bot a abrir una nueva conversación y tener un contexto limpio.
+    await db.cancelar_conversaciones_abiertas(persona_id)
     
     welcome_message = (
         f"¡Hola {user_name}!\n"
@@ -43,7 +47,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if update.message:
         await update.message.reply_text(welcome_message)
 
-async def generar_resumen(conversacion_id: int):
+async def generar_resumen(conversacion_id: int, estado_final: str = 'CERRADA'):
     logger.info(f"Generando resumen para la conversación {conversacion_id}...")
     historial = await db.obtener_historial_mensajes(conversacion_id, 30)
     
@@ -62,15 +66,15 @@ async def generar_resumen(conversacion_id: int):
     try:
         response = await client.chat(model=model_name, messages=messages)
         resumen = response['message']['content']
-        await db.cerrar_conversacion(conversacion_id, resumen)
-        logger.info(f"Resumen guardado exitosamente para conversación {conversacion_id}")
+        await db.cerrar_conversacion(conversacion_id, resumen, estado=estado_final)
+        logger.info(f"Resumen guardado exitosamente para conversación {conversacion_id} con estado {estado_final}")
     except Exception as e:
         logger.error(f"Error generando resumen: {e}")
 
 async def timeout_conversacion(context: ContextTypes.DEFAULT_TYPE):
     conversacion_id = context.job.data
     logger.info(f"Timeout disparado por inactividad en conversación {conversacion_id}")
-    await generar_resumen(conversacion_id)
+    await generar_resumen(conversacion_id, estado_final='CANCELADA')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja los mensajes de texto de los pacientes."""

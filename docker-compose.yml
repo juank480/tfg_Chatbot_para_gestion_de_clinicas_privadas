@@ -22,10 +22,12 @@ services:
 
   telegram-bot:
     build: ./bot
-    container_name: chatbot_clinica_telegram
+    container_name: chatbot_clinica_telegram_doctor
     restart: always
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=db
     depends_on:
       - db
 
@@ -38,6 +40,7 @@ services:
       - .env
     environment:
       - OLLAMA_HOST=http://ollama:11434
+      - POSTGRES_HOST=db
     depends_on:
       - ollama
       - db
