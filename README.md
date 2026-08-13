@@ -19,14 +19,8 @@ Para ponerlo en marcha, necesitas ejecutar los siguientes pasos en tu máquina:
 > ```bash
 > docker-compose up -d --build
 > ```
-
-> [!WARNING]
 > **Paso 3: Descargar el modelo Llama 3.1 en Ollama**
-> La primera vez que corres el contenedor de Ollama, estará vacío. Debes descargar el modelo Llama 3.1. Ejecuta este comando (puede tardar un rato dependiendo de tu conexión):
+> La primera vez que corres el contenedor de Ollama, estará vacío. Debes descargar el modelo Llama 3.1. (o el modélo de tu preferencia) Ejecuta este comando (puede tardar un rato dependiendo de tu conexión):
 > ```bash
-> docker exec -it chatbot_clinica_ollama ollama run llama3.1
+> docker exec -it chatbot_clinica_ollama ollama run llama3.1 
 > ```
-> *(Una vez descargue y abra el prompt interactivo, puedes salir con `/bye` o `Ctrl+D`)*.
-
-**Paso 4: Pruébalo**
-Abre Telegram, busca tu nuevo bot, mándale el comando `/start` e intenta explicarle algunos síntomas para ver cómo responde y verifica que no te receta nada.
