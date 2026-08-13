@@ -35,34 +35,116 @@ class Database:
             await self.pool.close()
             logger.info("Conexión a la base de datos cerrada.")
 
-    async def get_resumenes_doctor(self, doctor_id: int):
-        """
-        Obtiene los resúmenes de las conversaciones de un doctor específico.
-        :param doctor_id: ID del doctor (persona_id)
-        :return: Lista de registros con la información del resumen
-        """
-        if not self.pool:
-            await self.connect()
-
+    async def get_or_create_persona(self, telegram_id: int, nombre: str, telefono: str = None) -> int:
+        if not self.pool: await self.connect()
         try:
-            async with self.pool.acquire() as connection:
+            async with self.pool.acquire() as conn:
                 query = """
-                    SELECT 
-                        paciente_nombre, 
-                        paciente_telefono, 
-                        resumen, 
-                        created_at
-                    FROM 
-                        vista_resumenes_doctor
-                    WHERE 
-                        doctor_id = $1
-                    ORDER BY 
-                        created_at DESC;
+                    INSERT INTO persona (id, nombre, telefono)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (id) DO UPDATE 
+                    SET nombre = EXCLUDED.nombre,
+                        telefono = COALESCE(EXCLUDED.telefono, persona.telefono)
+                    RETURNING id;
                 """
-                records = await connection.fetch(query, doctor_id)
+                record = await conn.fetchrow(query, telegram_id, nombre, telefono)
+                return record['id']
+        except Exception as e:
+            logger.error(f"Error en get_or_create_persona: {e}")
+            return None
+
+    async def get_or_create_conversacion(self, persona_id: int) -> int:
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                query_find = "SELECT id FROM conversacion WHERE persona_id = $1 AND estado = 'ABIERTA' ORDER BY created_at DESC LIMIT 1"
+                record = await conn.fetchrow(query_find, persona_id)
+                if record:
+                    return record['id']
+                
+                query_create = """
+                    INSERT INTO conversacion (persona_id, doctor_id, estado)
+                    VALUES ($1, NULL, 'ABIERTA')
+                    RETURNING id;
+                """
+                record = await conn.fetchrow(query_create, persona_id)
+                return record['id']
+        except Exception as e:
+            logger.error(f"Error en get_or_create_conversacion: {e}")
+            return None
+
+    async def guardar_mensaje(self, conversacion_id: int, emisor_id: int | None, texto: str):
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                query = """
+                    INSERT INTO mensaje (conversacion_id, emisor_id, texto)
+                    VALUES ($1, $2, $3);
+                """
+                await conn.execute(query, conversacion_id, emisor_id, texto)
+        except Exception as e:
+            logger.error(f"Error en guardar_mensaje: {e}")
+
+    async def obtener_historial_mensajes(self, conversacion_id: int, limite: int = 20) -> list:
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                query = """
+                    SELECT emisor_id, texto 
+                    FROM mensaje 
+                    WHERE conversacion_id = $1 
+                    ORDER BY fecha ASC 
+                    LIMIT $2;
+                """
+                records = await conn.fetch(query, conversacion_id, limite)
                 return records
         except Exception as e:
-            logger.error(f"Error al obtener resúmenes del doctor {doctor_id}: {e}")
+            logger.error(f"Error en obtener_historial_mensajes: {e}")
+            return []
+
+    async def cerrar_conversacion(self, conversacion_id: int, resumen: str):
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                query = """
+                    UPDATE conversacion 
+                    SET resumen = $1, estado = 'CERRADA', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $2;
+                """
+                await conn.execute(query, resumen, conversacion_id)
+        except Exception as e:
+            logger.error(f"Error en cerrar_conversacion: {e}")
+
+    async def get_resumenes_doctor(self, doctor_id: int):
+        """
+        Obtiene los resúmenes de las conversaciones cerradas.
+        Ignoramos el doctor_id por ahora para que el doctor vea todos los triajes pendientes.
+        """
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                # Usamos una query directa en vez de la vista para poder ver a pacientes sin doctor_id asignado
+                query = """
+                    SELECT 
+                        c.id AS conversacion_id,
+                        p.id AS paciente_telegram_id,
+                        p.nombre AS paciente_nombre, 
+                        COALESCE(p.telefono, 'No facilitado') AS paciente_telefono, 
+                        c.resumen, 
+                        c.created_at
+                    FROM 
+                        conversacion c
+                    JOIN 
+                        persona p ON c.persona_id = p.id
+                    WHERE 
+                        c.estado = 'CERRADA' AND c.resumen IS NOT NULL
+                    ORDER BY 
+                        c.updated_at DESC;
+                """
+                records = await conn.fetch(query)
+                return records
+        except Exception as e:
+            logger.error(f"Error al obtener resúmenes: {e}")
             return None
 
 # Instancia global de la base de datos

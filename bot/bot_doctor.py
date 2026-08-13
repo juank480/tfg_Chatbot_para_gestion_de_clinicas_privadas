@@ -8,6 +8,7 @@ from telegram.ext import (
     ContextTypes,
     MessageHandler,
     filters,
+    ReplyKeyboardMarkup,
 )
 from database import db
 
@@ -24,13 +25,20 @@ logger = logging.getLogger(__name__)
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /start."""
     user_name = update.effective_user.first_name if update.effective_user else "usuario"
+    
+    keyboard = [
+        ["📄 Ver Resúmenes Pendientes"],
+        ["❓ Ayuda"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
     welcome_message = (
         f"¡Hola {user_name}! 👋\n"
         "Bienvenido al sistema de gestión de clínicas privadas.\n\n"
-        "Escribe /help para ver los comandos disponibles."
+        "Utiliza los botones del menú de abajo para interactuar con el sistema."
     )
     if update.message:
-        await update.message.reply_text(welcome_message)
+        await update.message.reply_text(welcome_message, reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /help."""
@@ -43,27 +51,32 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if update.message:
         await update.message.reply_text(help_text, parse_mode="Markdown")
 
-async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Responde a los mensajes de texto habituales del usuario."""
-    if update.message and update.message.text:
-        await update.message.reply_text(f"Has dicho: {update.message.text}")
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja las pulsaciones de los botones del teclado interactivo."""
+    if not update.message or not update.message.text:
+        return
+        
+    text = update.message.text
+    if text == "📄 Ver Resúmenes Pendientes":
+        # Simulamos que llamaron a /resumen
+        await get_resumen_command(update, context)
+    elif text == "❓ Ayuda":
+        # Simulamos que llamaron a /help
+        await help_command(update, context)
+    else:
+        await update.message.reply_text(f"Comando o botón no reconocido: {text}")
 
 async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /resumen."""
-    if not context.args:
-        if update.message:
-            await update.message.reply_text("Por favor, proporciona el ID del doctor. Uso: /resumen <id_doctor>")
-        return
-
-    try:
-        doctor_id = int(context.args[0])
-    except ValueError:
-        if update.message:
-            await update.message.reply_text("El ID del doctor debe ser un número entero.")
-        return
+    doctor_id = 1
+    if context.args:
+        try:
+            doctor_id = int(context.args[0])
+        except ValueError:
+            pass # Ignoramos error y usamos doctor_id 1 por defecto
 
     if update.message:
-        await update.message.reply_text("Consultando resúmenes...")
+        await update.message.reply_text("Consultando resúmenes de pacientes pendientes...")
     
     resumenes = await db.get_resumenes_doctor(doctor_id)
     
@@ -74,12 +87,13 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if not resumenes:
         if update.message:
-            await update.message.reply_text(f"No se encontraron resúmenes para el doctor con ID {doctor_id}.")
+            await update.message.reply_text("No hay resúmenes pendientes.")
         return
 
-    respuesta = f" *Resúmenes del Doctor ID {doctor_id}:*\n\n"
+    respuesta = f" *Resúmenes de Pacientes:*\n\n"
     for r in resumenes:
-        respuesta += f"- *Paciente:* {r['paciente_nombre']} ({r['paciente_telefono']})\n"
+        respuesta += f"- *Paciente:* {r['paciente_nombre']} (Tel: {r['paciente_telefono']})\n"
+        respuesta += f"  *Telegram ID:* `{r['paciente_telegram_id']}` | *Chat ID:* `{r['conversacion_id']}`\n"
         respuesta += f"  *Resumen:* {r['resumen']}\n"
         respuesta += f"  *Fecha:* {r['created_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
 
@@ -107,8 +121,8 @@ def create_application(token: str) -> Application:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("resumen", get_resumen_command))
     
-    # Registrar handler de mensajes de texto
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_message))
+    # Registrar handler de botones (mensajes de texto)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, button_handler))
 
     # Registrar manejador global de errores
     application.add_error_handler(error_handler)

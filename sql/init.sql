@@ -1,9 +1,9 @@
 -- Esquema de base de datos para Gestión de Clínicas Privadas (Chatbot)
 
 CREATE TABLE IF NOT EXISTS persona (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
-    telefono VARCHAR(50) UNIQUE NOT NULL,
+    telefono VARCHAR(50),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS conversacion (
     persona_id BIGINT NOT NULL REFERENCES persona(id) ON DELETE CASCADE,
     doctor_id BIGINT REFERENCES doctor(persona_id) ON DELETE SET NULL,
     resumen TEXT,
+    estado VARCHAR(20) DEFAULT 'ABIERTA',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -41,9 +42,11 @@ CREATE OR REPLACE VIEW vista_resumenes_doctor AS
 SELECT 
     c.doctor_id,
     c.id AS conversacion_id,
+    p.id AS paciente_telegram_id,
     p.nombre AS paciente_nombre,
-    p.telefono AS paciente_telefono,
+    COALESCE(p.telefono, 'No facilitado') AS paciente_telefono,
     c.resumen,
+    c.estado,
     c.created_at
 FROM 
     conversacion c
