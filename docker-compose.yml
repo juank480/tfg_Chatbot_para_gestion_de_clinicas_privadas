@@ -20,7 +20,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
-  telegram-bot:
+  telegram-bot-doctor:
     build: ./bot
     container_name: chatbot_clinica_telegram_doctor
     restart: always
