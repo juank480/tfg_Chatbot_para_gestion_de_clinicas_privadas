@@ -35,7 +35,7 @@ services:
     build: ./bot
     container_name: chatbot_clinica_telegram_paciente
     restart: always
-    command: ["python", "paciente_bot.py"]
+    command: ["python", "bot_paciente.py"]
     env_file:
       - .env
     environment:
