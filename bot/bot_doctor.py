@@ -140,6 +140,16 @@ def main() -> None:
     # Inicia el bot en modo polling
     application.run_polling()
 
+    # Para usar modo Webhook en producción/nube, desposta 'run_polling()' y comenta las siguientes líneas:
+    # webhook_url = os.getenv("WEBHOOK_URL")  # Ej: https://tu-app.onrender.com
+    # port = int(os.getenv("PORT", 8080))
+    # application.run_webhook(
+    #     listen="0.0.0.0",
+    #     port=port,
+    #     url_path=token,
+    #     webhook_url=f"{webhook_url}/{token}"
+    # )
+
 
 if __name__ == '__main__':
     main()
