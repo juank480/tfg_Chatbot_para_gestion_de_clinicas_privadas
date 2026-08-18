@@ -10,6 +10,7 @@ from telegram.ext import (
     filters,
 )
 from database import db
+import calendar_service
 
 # Configuración de logging
 logging.basicConfig(
@@ -26,7 +27,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user_name = update.effective_user.first_name if update.effective_user else "usuario"
     
     keyboard = [
-        ["📄 Ver Resúmenes Pendientes"],
+        ["📄 Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
         ["❓ Ayuda"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -45,7 +46,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "📌 *Comandos disponibles:*\n"
         "/start - Iniciar interacción con el bot\n"
         "/help - Mostrar este mensaje de ayuda\n"
-        "/resumen <id_doctor> - Obtener el resumen de las conversaciones de un doctor"
+        "/resumen <id_doctor> - Obtener el resumen de las conversaciones de un doctor\n"
+        "/citas_hoy - Ver las citas programadas para el día de hoy"
     )
     if update.message:
         await update.message.reply_text(help_text, parse_mode="Markdown")
@@ -57,10 +59,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     text = update.message.text
     if text == "📄 Ver Resúmenes Pendientes":
-        # Simulamos que llamaron a /resumen
         await get_resumen_command(update, context)
+    elif text == "📅 Ver Citas de Hoy":
+        await get_citas_hoy_command(update, context)
     elif text == "❓ Ayuda":
-        # Simulamos que llamaron a /help
         await help_command(update, context)
     else:
         await update.message.reply_text(f"Comando o botón no reconocido: {text}")
@@ -103,6 +105,35 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if update.message:
         await update.message.reply_text(respuesta, parse_mode="Markdown")
 
+async def get_citas_hoy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Consulta las citas de hoy en Google Calendar."""
+    if update.message:
+        await update.message.reply_text("🗓️ Consultando el calendario para el día de hoy...")
+    
+    citas = await calendar_service.get_todays_appointments()
+    
+    if not citas:
+        if update.message:
+            await update.message.reply_text("✅ No tienes citas programadas para el día de hoy.")
+        return
+
+    respuesta = "📅 *Tus citas para hoy:*\n\n"
+    for event in citas:
+        summary = event.get('summary', 'Sin título')
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        end = event['end'].get('dateTime', event['end'].get('date'))
+        
+        # Formatear la hora
+        if 'T' in start:
+            start_time = start.split('T')[1][:5]
+            end_time = end.split('T')[1][:5]
+            respuesta += f"🔸 *{start_time} - {end_time}*: {summary}\n"
+        else:
+            respuesta += f"🔸 *Todo el día*: {summary}\n"
+            
+    if update.message:
+        await update.message.reply_text(respuesta, parse_mode="Markdown")
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja los errores ocurridos durante la ejecución del bot."""
     logger.error("Excepción ocurrida al procesar una actualización:", exc_info=context.error)
@@ -123,6 +154,7 @@ def create_application(token: str) -> Application:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("resumen", get_resumen_command))
+    application.add_handler(CommandHandler("citas_hoy", get_citas_hoy_command))
     
     # Registrar handler de botones (mensajes de texto)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, button_handler))

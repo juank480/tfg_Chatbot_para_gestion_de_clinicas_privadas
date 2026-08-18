@@ -1,2 +1,4 @@
 .env
 __pycache__/botUtils.cpython-314.pyc
+credentials.json
+token.json

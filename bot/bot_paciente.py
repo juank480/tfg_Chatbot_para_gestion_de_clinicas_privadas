@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import asyncio
 from telegram import Update
@@ -12,6 +13,7 @@ from telegram.ext import (
 )
 from ollama import AsyncClient
 from database import db
+import calendar_service
 
 # Configuración de logging
 logging.basicConfig(
@@ -24,9 +26,10 @@ SYSTEM_PROMPT = """Eres un asistente virtual para un doctor en una clínica priv
 Tu objetivo es tomar nota de los síntomas del paciente y ayudar a concertar citas.
 REGLA ESTRICTA: No puedes recetar medicinas ni dar diagnósticos bajo ninguna circunstancia.
 Limítate a preguntar por sus síntomas, tomar sus datos y sugerir que el doctor revisará la información o ayudarles a agendar una visita.
+Si el paciente desea agendar una cita, DEBES utilizar las herramientas proporcionadas (check_availability y create_appointment) para revisar las citas existentes y programar una nueva.
 Sé amable y profesional.
 
-INSTRUCCIÓN CRÍTICA: Cuando consideres que ya tienes todos los síntomas y datos necesarios para el doctor, despídete del paciente y añade AL FINAL de tu respuesta exactamente este texto: [FIN_TOMA_DATOS]."""
+INSTRUCCIÓN CRÍTICA: Cuando consideres que ya tienes todos los síntomas y datos necesarios para el doctor, y se haya terminado de agendar la cita si el usuario lo requería, despídete del paciente y añade AL FINAL de tu respuesta exactamente este texto: [FIN_TOMA_DATOS]."""
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /start."""
@@ -115,22 +118,98 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         client = AsyncClient(host=ollama_host)
         
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "check_availability",
+                    "description": "Comprueba las citas existentes para un día específico y devuelve la disponibilidad.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "date_str": {
+                                "type": "string",
+                                "description": "Fecha en formato YYYY-MM-DD (Ej: 2024-11-25)"
+                            }
+                        },
+                        "required": ["date_str"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_appointment",
+                    "description": "Crea una nueva cita médica en el calendario.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "summary": {
+                                "type": "string",
+                                "description": "Título de la cita (Ej: Cita con Paciente X)"
+                            },
+                            "date_str": {
+                                "type": "string",
+                                "description": "Fecha en formato YYYY-MM-DD"
+                            },
+                            "time_str": {
+                                "type": "string",
+                                "description": "Hora de la cita en formato HH:MM"
+                            }
+                        },
+                        "required": ["summary", "date_str", "time_str"]
+                    }
+                }
+            }
+        ]
+        
         response = await client.chat(
             model=model_name,
-            messages=messages
+            messages=messages,
+            tools=tools
         )
         
-        bot_reply = response['message']['content']
+        # Procesar posibles tool calls (pueden ser múltiples)
+        if response['message'].get('tool_calls'):
+            messages.append(response['message'])
+            for tool_call in response['message']['tool_calls']:
+                function_name = tool_call['function']['name']
+                arguments = tool_call['function']['arguments']
+                
+                logger.info(f"Ollama llama a la herramienta: {function_name} con {arguments}")
+                
+                tool_result = ""
+                if function_name == "check_availability":
+                    tool_result = await calendar_service.check_availability(arguments.get("date_str"))
+                elif function_name == "create_appointment":
+                    tool_result = await calendar_service.create_appointment(
+                        arguments.get("summary"), 
+                        arguments.get("date_str"), 
+                        arguments.get("time_str")
+                    )
+                
+                messages.append({
+                    "role": "tool",
+                    "content": tool_result
+                })
+            
+            # Volvemos a llamar a Ollama con los resultados de las herramientas
+            response = await client.chat(
+                model=model_name,
+                messages=messages,
+                tools=tools
+            )
+
+        bot_reply = response['message'].get('content', '')
         
         # Detección de Fin de Triage
         terminado = False
-        if "[FIN_TOMA_DATOS]" in bot_reply:
+        if bot_reply and "[FIN_TOMA_DATOS]" in bot_reply:
             bot_reply = bot_reply.replace("[FIN_TOMA_DATOS]", "").strip()
             terminado = True
         
-        await db.guardar_mensaje(conversacion_id, None, bot_reply)
-        
         if bot_reply:
+            await db.guardar_mensaje(conversacion_id, None, bot_reply)
             await update.message.reply_text(bot_reply)
         
         if terminado:

@@ -21,6 +21,9 @@ Para ponerlo en marcha, necesitas ejecutar los siguientes pasos en tu máquina:
 > ```
 > **Paso 3: Descargar el modelo Llama 3.1 en Ollama**
 > La primera vez que corres el contenedor de Ollama, estará vacío. Debes descargar el modelo Llama 3.1. (o el modélo de tu preferencia) Ejecuta este comando (puede tardar un rato dependiendo de tu conexión):
-> ```bash
+>```bash
 > docker exec -it chatbot_clinica_ollama ollama run llama3.1 
 > ```
+
+>[!TIP]
+>Para la conexión de google calendar genera una aplicación y un credential.json en está carpeta.

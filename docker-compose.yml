@@ -28,6 +28,9 @@ services:
       - .env
     environment:
       - POSTGRES_HOST=db
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./token.json:/app/token.json
     depends_on:
       - db
 
@@ -41,6 +44,9 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - POSTGRES_HOST=db
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./token.json:/app/token.json
     depends_on:
       - ollama
       - db
