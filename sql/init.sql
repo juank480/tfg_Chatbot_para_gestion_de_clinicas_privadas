@@ -11,8 +11,10 @@ CREATE TABLE IF NOT EXISTS persona (
 CREATE TABLE IF NOT EXISTS doctor (
     persona_id BIGINT PRIMARY KEY REFERENCES persona(id) ON DELETE CASCADE,
     especialidad VARCHAR(255),
-    colegiado_numero VARCHAR(100) UNIQUE
+    telefono VARCHAR(50) UNIQUE,
+    password_hash VARCHAR(255)
 );
+
 
 CREATE TABLE IF NOT EXISTS conversacion (
     id BIGSERIAL PRIMARY KEY,

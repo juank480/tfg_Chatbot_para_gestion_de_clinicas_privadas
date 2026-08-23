@@ -1,12 +1,13 @@
 import os
 import logging
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    ConversationHandler,
     filters,
 )
 from database import db
@@ -19,6 +20,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Estados para la conversación de Login
+TELEFONO, PASSWORD = range(2)
 
 # --- Handlers de Comandos Básico ---
 
@@ -26,32 +29,117 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Maneja el comando /start."""
     user_name = update.effective_user.first_name if update.effective_user else "usuario"
     
-    keyboard = [
-        ["📄 Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
-        ["❓ Ayuda"]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    # Si ya está logueado, le mostramos el menú directamente
+    if context.user_data.get('doctor_id'):
+        keyboard = [
+            ["📄 Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
+            ["❓ Ayuda"]
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        welcome_message = f"¡Hola de nuevo {user_name}! 👋\nUsa los botones para interactuar."
+        await update.message.reply_text(welcome_message, reply_markup=reply_markup)
+        return
 
     welcome_message = (
         f"¡Hola {user_name}! 👋\n"
         "Bienvenido al sistema de gestión de clínicas privadas.\n\n"
-        "Utiliza los botones del menú de abajo para interactuar con el sistema."
+        "Por favor, inicia sesión usando el comando /login para continuar."
     )
     if update.message:
-        await update.message.reply_text(welcome_message, reply_markup=reply_markup)
+        await update.message.reply_text(welcome_message, reply_markup=ReplyKeyboardRemove())
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /help."""
     help_text = (
         "📌 *Comandos disponibles:*\n"
         "/start - Iniciar interacción con el bot\n"
+        "/login - Iniciar sesión con tu teléfono y contraseña\n"
+        "/logout - Cerrar sesión\n"
         "/help - Mostrar este mensaje de ayuda\n"
-        "/resumen <id_doctor> - Obtener el resumen de las conversaciones de un doctor\n"
+        "/resumen - Obtener el resumen de tus conversaciones\n"
         "/citas_hoy - Ver las citas programadas para el día de hoy"
     )
     if update.message:
         await update.message.reply_text(help_text, parse_mode="Markdown")
 
+# --- Flujo de Login ---
+
+async def login_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Inicia el flujo de login pidiendo el teléfono."""
+    if context.user_data.get('doctor_id'):
+        await update.message.reply_text("Ya has iniciado sesión. Usa /logout si quieres salir.")
+        return ConversationHandler.END
+
+    await update.message.reply_text(
+        "Por favor, introduce tu número de teléfono registrado:\n"
+        "(Puedes usar /cancelar para abortar el login)",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return TELEFONO
+
+async def login_telefono(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Guarda el teléfono y pide la contraseña."""
+    telefono = update.message.text.strip()
+    context.user_data['temp_telefono'] = telefono
+    
+    await update.message.reply_text("Ahora, introduce tu contraseña:")
+    return PASSWORD
+
+async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Verifica el teléfono y la contraseña."""
+    password = update.message.text.strip()
+    telefono = context.user_data.get('temp_telefono')
+    
+    # Borrar temporal por seguridad
+    if 'temp_telefono' in context.user_data:
+        del context.user_data['temp_telefono']
+        
+    await update.message.reply_text("Verificando credenciales...")
+    
+    doctor_id = await db.autenticar_doctor(telefono, password)
+    
+    if doctor_id:
+        context.user_data['doctor_id'] = doctor_id
+        
+        keyboard = [
+            ["📄 Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
+            ["❓ Ayuda"]
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        
+        await update.message.reply_text(
+            "✅ ¡Inicio de sesión exitoso!\nYa puedes usar los botones del menú.",
+            reply_markup=reply_markup
+        )
+    else:
+        await update.message.reply_text("❌ Teléfono o contraseña incorrectos. Usa /login para volver a intentarlo.")
+        
+    return ConversationHandler.END
+
+async def login_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancela el flujo de login."""
+    if 'temp_telefono' in context.user_data:
+        del context.user_data['temp_telefono']
+    await update.message.reply_text("Inicio de sesión cancelado.")
+    return ConversationHandler.END
+
+async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cierra la sesión del doctor."""
+    context.user_data.clear()
+    await update.message.reply_text("Has cerrado sesión correctamente. Usa /login para volver a entrar.", reply_markup=ReplyKeyboardRemove())
+
+# --- Comandos Protegidos ---
+
+def require_login(func):
+    """Decorador para requerir login antes de ejecutar un comando."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        if not context.user_data.get('doctor_id'):
+            await update.message.reply_text("⚠️ Debes iniciar sesión con /login para usar esta función.")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapper
+
+@require_login
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja las pulsaciones de los botones del teclado interactivo."""
     if not update.message or not update.message.text:
@@ -67,14 +155,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         await update.message.reply_text(f"Comando o botón no reconocido: {text}")
 
+@require_login
 async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /resumen."""
-    doctor_id = 1
-    if context.args:
-        try:
-            doctor_id = int(context.args[0])
-        except ValueError:
-            pass # Ignoramos error y usamos doctor_id 1 por defecto
+    doctor_id = context.user_data.get('doctor_id')
 
     if update.message:
         await update.message.reply_text("Consultando resúmenes de pacientes pendientes...")
@@ -105,6 +189,7 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if update.message:
         await update.message.reply_text(respuesta, parse_mode="Markdown")
 
+@require_login
 async def get_citas_hoy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Consulta las citas de hoy en Google Calendar."""
     if update.message:
@@ -138,42 +223,45 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     """Maneja los errores ocurridos durante la ejecución del bot."""
     logger.error("Excepción ocurrida al procesar una actualización:", exc_info=context.error)
 
-
 # --- Funciones de Configuración y Ejecución ---
 
 def create_application(token: str) -> Application:
-    """
-    Crea y configura la instancia del bot de Telegram con sus manejadores.
-    
-    :param token: Token de autenticación de Telegram Bot API.
-    :return: Instancia configurada de Application.
-    """
     application = ApplicationBuilder().token(token).build()
 
-    # Registrar handlers de comandos
+    # Handlers básicos
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("logout", logout_command))
+    
+    # Comandos que requieren login
     application.add_handler(CommandHandler("resumen", get_resumen_command))
     application.add_handler(CommandHandler("citas_hoy", get_citas_hoy_command))
+
+    # ConversationHandler para login
+    login_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('login', login_start)],
+        states={
+            TELEFONO: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_telefono)],
+            PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_password)],
+        },
+        fallbacks=[CommandHandler('cancelar', login_cancel)]
+    )
+    application.add_handler(login_conv_handler)
     
-    # Registrar handler de botones (mensajes de texto)
+    # Botones (fallback tras los comandos)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, button_handler))
 
-    # Registrar manejador global de errores
     application.add_error_handler(error_handler)
 
     return application
 
 def main() -> None:
-    """Punto de entrada principal para iniciar el bot."""
-    # Intentar cargar variables de entorno desde el archivo .env si existe
     try:
-        from dotenv import load_dotenv # type: ignore
+        from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass
 
-    # El token se obtiene prioritariamente de las variables de entorno
     token = os.getenv("DOCTOR_BOT_TOKEN", "NOT_FOUND")
 
     if token == "NOT_FOUND" or not token:
@@ -183,22 +271,10 @@ def main() -> None:
         )
         return
 
-    logger.info("Iniciando el bot de Telegram...")
+    logger.info("Iniciando el bot de Telegram para doctores (con autenticación)...")
     application = create_application(token)
     
-    # Inicia el bot en modo polling
     application.run_polling()
-
-    # Para usar modo Webhook en producción/nube, desposta 'run_polling()' y comenta las siguientes líneas:
-    # webhook_url = os.getenv("WEBHOOK_URL")  # Ej: https://tu-app.onrender.com
-    # port = int(os.getenv("PORT", 8080))
-    # application.run_webhook(
-    #     listen="0.0.0.0",
-    #     port=port,
-    #     url_path=token,
-    #     webhook_url=f"{webhook_url}/{token}"
-    # )
-
 
 if __name__ == '__main__':
     main()

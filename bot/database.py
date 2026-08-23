@@ -1,6 +1,7 @@
 import os
 import asyncpg
 import logging
+import bcrypt
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,26 @@ class Database:
                 return records
         except Exception as e:
             logger.error(f"Error al obtener resúmenes: {e}")
+            return None
+
+    async def autenticar_doctor(self, telefono: str, password: str) -> int | None:
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                query = """
+                    SELECT persona_id, password_hash
+                    FROM doctor
+                    WHERE telefono = $1;
+                """
+                record = await conn.fetchrow(query, telefono)
+                
+                if record and record['password_hash']:
+                    # Verificar contraseña
+                    if bcrypt.checkpw(password.encode('utf-8'), record['password_hash'].encode('utf-8')):
+                        return record['persona_id']
+                return None
+        except Exception as e:
+            logger.error(f"Error en autenticar_doctor: {e}")
             return None
 
 # Instancia global de la base de datos
