@@ -32,7 +32,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Si ya está logueado, le mostramos el menú directamente
     if context.user_data.get('doctor_id'):
         keyboard = [
-            ["Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
+            ["Ver Resúmenes Pendientes", "Ver Citas de Hoy"],
             ["Ayuda"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -146,11 +146,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
         
     text = update.message.text
-    if text == "Ver Resúmenes de hoy":
+    if text == "📝 Ver Resúmenes Pendientes":
         await get_resumen_command(update, context)
-    elif text == "Ver Citas de Hoy":
+    elif text == "📅 Ver Citas de Hoy":
         await get_citas_hoy_command(update, context)
-    elif text == "Ayuda":
+    elif text == "❓ Ayuda":
         await help_command(update, context)
     else:
         await update.message.reply_text(f"Comando o botón no reconocido: {text}")
@@ -178,7 +178,7 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     respuesta = f" *Resúmenes de Pacientes:*\n\n"
     for r in resumenes:
         cita = r['cita_medica_fecha'].strftime('%Y-%m-%d %H:%M') if r['cita_medica_fecha'] else "Pendiente de asignar"
-        icono = "🔴 (Abandono)" if r['estado'] == 'CANCELADA' else "🟢 (Completado)"
+        icono = "(Abandono)" if r['estado'] == 'CANCELADA' else "(Completado)"
         respuesta += f"- *Paciente:* {r['paciente_nombre']} (Tel: {r['paciente_telefono']})\n"
         respuesta += f"  *Telegram ID:* `{r['paciente_telegram_id']}` | *Chat ID:* `{r['conversacion_id']}`\n"
         respuesta += f"  *Estado Triaje:* {icono}\n"
