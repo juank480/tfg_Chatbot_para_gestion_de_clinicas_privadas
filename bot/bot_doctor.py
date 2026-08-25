@@ -32,8 +32,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Si ya está logueado, le mostramos el menú directamente
     if context.user_data.get('doctor_id'):
         keyboard = [
-            ["📄 Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
-            ["❓ Ayuda"]
+            ["Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
+            ["Ayuda"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         welcome_message = f"¡Hola de nuevo {user_name}! 👋\nUsa los botones para interactuar."
@@ -51,7 +51,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /help."""
     help_text = (
-        "📌 *Comandos disponibles:*\n"
+        "*Comandos disponibles:*\n"
         "/start - Iniciar interacción con el bot\n"
         "/login - Iniciar sesión con tu teléfono y contraseña\n"
         "/logout - Cerrar sesión\n"
@@ -102,17 +102,17 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data['doctor_id'] = doctor_id
         
         keyboard = [
-            ["📄 Ver Resúmenes Pendientes", "📅 Ver Citas de Hoy"],
-            ["❓ Ayuda"]
+            ["Ver Resúmenes Pendientes", "Ver Citas de Hoy"],
+            ["Ayuda"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         
         await update.message.reply_text(
-            "✅ ¡Inicio de sesión exitoso!\nYa puedes usar los botones del menú.",
+            "¡Inicio de sesión exitoso!\nYa puedes acceder a las funcionalidades del bot.",
             reply_markup=reply_markup
         )
     else:
-        await update.message.reply_text("❌ Teléfono o contraseña incorrectos. Usa /login para volver a intentarlo.")
+        await update.message.reply_text("Teléfono o contraseña incorrectos. Usa /login para volver a intentarlo.")
         
     return ConversationHandler.END
 
@@ -134,7 +134,7 @@ def require_login(func):
     """Decorador para requerir login antes de ejecutar un comando."""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         if not context.user_data.get('doctor_id'):
-            await update.message.reply_text("⚠️ Debes iniciar sesión con /login para usar esta función.")
+            await update.message.reply_text("Debes iniciar sesión con /login para usar esta función.")
             return
         return await func(update, context, *args, **kwargs)
     return wrapper
@@ -146,11 +146,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
         
     text = update.message.text
-    if text == "📄 Ver Resúmenes Pendientes":
+    if text == "Ver Resúmenes de hoy":
         await get_resumen_command(update, context)
-    elif text == "📅 Ver Citas de Hoy":
+    elif text == "Ver Citas de Hoy":
         await get_citas_hoy_command(update, context)
-    elif text == "❓ Ayuda":
+    elif text == "Ayuda":
         await help_command(update, context)
     else:
         await update.message.reply_text(f"Comando o botón no reconocido: {text}")
