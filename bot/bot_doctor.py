@@ -41,7 +41,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     welcome_message = (
-        f"¡Hola {user_name}! 👋\n"
+        f"¡Hola {user_name}!\n"
         "Bienvenido al sistema de gestión de clínicas privadas.\n\n"
         "Por favor, inicia sesión usando el comando /login para continuar."
     )
@@ -146,11 +146,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
         
     text = update.message.text
-    if text == "📝 Ver Resúmenes Pendientes":
+    if text == "Ver Resúmenes Pendientes":
         await get_resumen_command(update, context)
-    elif text == "📅 Ver Citas de Hoy":
+    elif text == "Ver Citas de Hoy":
         await get_citas_hoy_command(update, context)
-    elif text == "❓ Ayuda":
+    elif text == "Ayuda":
         await help_command(update, context)
     else:
         await update.message.reply_text(f"Comando o botón no reconocido: {text}")
@@ -180,9 +180,6 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         cita = r['cita_medica_fecha'].strftime('%Y-%m-%d %H:%M') if r['cita_medica_fecha'] else "Pendiente de asignar"
         icono = "(Abandono)" if r['estado'] == 'CANCELADA' else "(Completado)"
         respuesta += f"- *Paciente:* {r['paciente_nombre']} (Tel: {r['paciente_telefono']})\n"
-        respuesta += f"  *Telegram ID:* `{r['paciente_telegram_id']}` | *Chat ID:* `{r['conversacion_id']}`\n"
-        respuesta += f"  *Estado Triaje:* {icono}\n"
-        respuesta += f"  *Cita Médica:* {cita}\n"
         respuesta += f"  *Resumen:* {r['resumen']}\n"
         respuesta += f"  *Fecha Registro:* {r['created_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
 
@@ -193,16 +190,16 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def get_citas_hoy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Consulta las citas de hoy en Google Calendar."""
     if update.message:
-        await update.message.reply_text("🗓️ Consultando el calendario para el día de hoy...")
+        await update.message.reply_text("Consultando el calendario para el día de hoy...")
     
     citas = await calendar_service.get_todays_appointments()
     
     if not citas:
         if update.message:
-            await update.message.reply_text("✅ No tienes citas programadas para el día de hoy.")
+            await update.message.reply_text("No tienes citas programadas para el día de hoy.")
         return
 
-    respuesta = "📅 *Tus citas para hoy:*\n\n"
+    respuesta = "*Tus citas para hoy:*\n\n"
     for event in citas:
         summary = event.get('summary', 'Sin título')
         start = event['start'].get('dateTime', event['start'].get('date'))
@@ -274,7 +271,19 @@ def main() -> None:
     logger.info("Iniciando el bot de Telegram para doctores (con autenticación)...")
     application = create_application(token)
     
-    application.run_polling()
+    webhook_url = os.getenv("WEBHOOK_URL")
+    
+    if webhook_url:
+        port = int(os.environ.get("PORT", 8443))
+        logger.info(f"Iniciando en modo Webhook en el puerto {port}...")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            webhook_url=webhook_url
+        )
+    else:
+        logger.info("Iniciando en modo Long Polling...")
+        application.run_polling()
 
 if __name__ == '__main__':
     main()

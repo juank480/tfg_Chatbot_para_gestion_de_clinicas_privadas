@@ -256,8 +256,19 @@ def main() -> None:
     logger.info("Iniciando el bot de pacientes...")
     application = create_application(token)
     
-    # Inicia el bot en modo polling
-    application.run_polling()
+    webhook_url = os.getenv("WEBHOOK_URL")
+    
+    if webhook_url:
+        port = int(os.environ.get("PORT", 8443))
+        logger.info(f"Iniciando en modo Webhook en el puerto {port}...")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            webhook_url=webhook_url
+        )
+    else:
+        logger.info("Iniciando en modo Long Polling...")
+        application.run_polling()
 
 if __name__ == '__main__':
     main()
