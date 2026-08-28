@@ -50,9 +50,12 @@ def _check_availability_sync(date_str: str) -> str:
         start_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
         end_date = start_date + datetime.timedelta(days=1)
         
-        # Ajustamos timezone si es necesario, pero simplificaremos asumiendo la hora local
-        time_min = start_date.astimezone().isoformat()
-        time_max = end_date.astimezone().isoformat()
+        tz = datetime.timezone(datetime.timedelta(hours=2))
+        start_date = start_date.replace(tzinfo=tz)
+        end_date = end_date.replace(tzinfo=tz)
+        
+        time_min = start_date.isoformat()
+        time_max = end_date.isoformat()
 
         logger.info(f"Buscando citas entre {time_min} y {time_max}")
         events_result = service.events().list(calendarId='primary', timeMin=time_min,
@@ -94,15 +97,18 @@ def _create_appointment_sync(summary: str, date_str: str, time_str: str) -> str:
         service = get_calendar_service()
         
         start_datetime = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        # Apply GMT+2 explicitly
+        tz = datetime.timezone(datetime.timedelta(hours=2))
+        start_datetime = start_datetime.replace(tzinfo=tz)
         end_datetime = start_datetime + datetime.timedelta(minutes=30)
         
         event = {
           'summary': summary,
           'start': {
-            'dateTime': start_datetime.astimezone().isoformat(),
+            'dateTime': start_datetime.isoformat(),
           },
           'end': {
-            'dateTime': end_datetime.astimezone().isoformat(),
+            'dateTime': end_datetime.isoformat(),
           },
         }
 
@@ -120,11 +126,12 @@ async def get_todays_appointments() -> list:
 def _get_todays_appointments_sync() -> list:
     try:
         service = get_calendar_service()
-        today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        tz = datetime.timezone(datetime.timedelta(hours=2))
+        today = datetime.datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
         tomorrow = today + datetime.timedelta(days=1)
         
-        time_min = today.astimezone().isoformat()
-        time_max = tomorrow.astimezone().isoformat()
+        time_min = today.isoformat()
+        time_max = tomorrow.isoformat()
         
         events_result = service.events().list(calendarId='primary', timeMin=time_min,
                                               timeMax=time_max, singleEvents=True,

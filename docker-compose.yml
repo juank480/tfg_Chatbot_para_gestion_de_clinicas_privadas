@@ -28,6 +28,7 @@ services:
       - .env
     environment:
       - POSTGRES_HOST=db
+      - TZ=Europe/Madrid
     volumes:
       - ./credentials.json:/app/credentials.json:ro
       - ./token.json:/app/token.json
@@ -44,6 +45,7 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - POSTGRES_HOST=db
+      - TZ=Europe/Madrid
     volumes:
       - ./credentials.json:/app/credentials.json:ro
       - ./token.json:/app/token.json
