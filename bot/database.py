@@ -12,8 +12,7 @@ class Database:
     async def connect(self):
         if not self.pool:
             try:
-                # Use environment variables, fallback to localhost if not found
-                # (e.g. if running locally outside docker, use POSTGRES_HOST=localhost)
+                # Use environment variables, 
                 host = os.getenv("POSTGRES_HOST", "localhost")
                 port = os.getenv("POSTGRES_PORT", "5432")
                 user = os.getenv("POSTGRES_USER", "clinica_user")
@@ -141,7 +140,6 @@ class Database:
         if not self.pool: await self.connect()
         try:
             async with self.pool.acquire() as conn:
-                # Usamos una query directa en vez de la vista para poder ver a pacientes sin doctor_id asignado
                 query = """
                     SELECT 
                         c.id AS conversacion_id,
