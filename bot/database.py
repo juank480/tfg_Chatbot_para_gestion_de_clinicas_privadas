@@ -91,11 +91,14 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 query = """
-                    SELECT emisor_id, texto 
-                    FROM mensaje 
-                    WHERE conversacion_id = $1 
-                    ORDER BY fecha ASC 
-                    LIMIT $2;
+                    SELECT emisor_id, texto FROM (
+                        SELECT emisor_id, texto, fecha
+                        FROM mensaje 
+                        WHERE conversacion_id = $1 
+                        ORDER BY fecha DESC 
+                        LIMIT $2
+                    ) AS subquery
+                    ORDER BY fecha ASC;
                 """
                 records = await conn.fetch(query, conversacion_id, limite)
                 return records

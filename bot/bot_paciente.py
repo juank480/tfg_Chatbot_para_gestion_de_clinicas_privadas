@@ -56,12 +56,20 @@ async def generar_resumen(conversacion_id: int, estado_final: str = 'CERRADA'):
     
     if not historial:
         return
-        
-    messages = [{"role": "system", "content": "Resume los síntomas médicos descritos por el paciente en esta conversación de forma breve y concisa. Actúa como si le estuvieras pasando el reporte a un médico."}]
+    texto_conversacion = ""
     for msg in historial:
-        role = "user" if msg['emisor_id'] is not None else "assistant"
-        messages.append({"role": role, "content": msg['texto']})
+        remitente = "Paciente" if msg['emisor_id'] is not None else "Asistente"
+        texto_conversacion += f"{remitente}: {msg['texto']}\n"
+        
+    prompt = (
+        "A continuación se muestra una conversación entre un paciente y un asistente médico. "
+        "Resume los síntomas médicos descritos por el paciente de forma breve y concisa. "
+        "Actúa como si le estuvieras pasando el reporte a un médico. "
+        "No respondas a la conversación, limítate a generar el resumen.\n\n"
+        f"Conversación:\n{texto_conversacion}\n\nResumen:"
+    )
     
+    messages = [{"role": "user", "content": prompt}]
     ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     model_name = os.getenv("OLLAMA_MODEL", "llama3.1")
     client = AsyncClient(host=ollama_host)
@@ -104,7 +112,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Construir historial para Llama 3.1
     historial_db = await db.obtener_historial_mensajes(conversacion_id, 20)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    import datetime
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.datetime.now().strftime("%H:%M")
+    
+    system_prompt_dynamic = f"{SYSTEM_PROMPT}\n\nINFORMACIÓN IMPORTANTE: La fecha de hoy es {current_date} y la hora actual es {current_time}. Usa esta fecha de HOY como única referencia válida cuando el usuario pida citas 'hoy', 'mañana' o para un día de la semana."
+    
+    messages = [{"role": "system", "content": system_prompt_dynamic}]
     
     for msg in historial_db:
         role = "user" if msg['emisor_id'] is not None else "assistant"
@@ -129,7 +143,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         "properties": {
                             "date_str": {
                                 "type": "string",
-                                "description": "Fecha en formato YYYY-MM-DD (Ej: 2024-11-25)"
+                                "description": "Fecha en formato YYYY-MM-DD"
                             }
                         },
                         "required": ["date_str"]
