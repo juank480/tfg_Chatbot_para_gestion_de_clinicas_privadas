@@ -3,3 +3,4 @@ __pycache__/botUtils.cpython-314.pyc
 credentials.json
 token.json
 calendar_service.cpython-314.pyc
+ollama_data

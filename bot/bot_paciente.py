@@ -15,6 +15,10 @@ from ollama import AsyncClient
 from database import db
 import calendar_service
 
+# Constantes de configuración
+MAX_MENSAJES_HISTORIAL = 12
+MAX_MENSAJES_RESUMEN = 30
+
 # Configuración de logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -45,14 +49,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     welcome_message = (
         f"¡Hola {user_name}!\n"
         "Soy el asistente virtual de la clínica. Estoy aquí para tomar nota de tus síntomas "
-        "y ayudarte a concertar una cita con el doctor. ¿En qué te puedo ayudar hoy?"
+        "y ayudarte a concertar una cita con el doctor. ¿En qué te puedo ayudar hoy?\n\n"
+        "Aviso de Privacidad: Utilizando este servicio acepta automáticamente el tratamiento de sus datos. "
+        "En caso de necesitar la eliminación de estos debe ponerse en contacto con el Doctor."
     )
     if update.message:
         await update.message.reply_text(welcome_message)
 
 async def generar_resumen(conversacion_id: int, estado_final: str = 'CERRADA'):
     logger.info(f"Generando resumen para la conversación {conversacion_id}...")
-    historial = await db.obtener_historial_mensajes(conversacion_id, 30)
+    historial = await db.obtener_historial_mensajes(conversacion_id, MAX_MENSAJES_RESUMEN)
     
     if not historial:
         return
@@ -110,8 +116,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # 900 segundos = 15 minutos
     context.job_queue.run_once(timeout_conversacion, 900, data=conversacion_id, name=job_name)
 
-    # Construir historial para Llama 3.1
-    historial_db = await db.obtener_historial_mensajes(conversacion_id, 20)
+    # Construir historial para Llama
+    historial_db = await db.obtener_historial_mensajes(conversacion_id, MAX_MENSAJES_HISTORIAL)
     import datetime
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.datetime.now().strftime("%H:%M")
