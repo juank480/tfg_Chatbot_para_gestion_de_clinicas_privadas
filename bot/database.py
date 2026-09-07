@@ -187,5 +187,19 @@ class Database:
             logger.error(f"Error en autenticar_doctor: {e}")
             return None
 
+    async def eliminar_datos_paciente(self, paciente_id: int) -> bool:
+        if not self.pool: await self.connect()
+        try:
+            async with self.pool.acquire() as conn:
+                query = "DELETE FROM persona WHERE id = $1;"
+                result = await conn.execute(query, paciente_id)
+                # execute returns a string like "DELETE 1" or "DELETE 0"
+                if result == "DELETE 0":
+                    return False
+                return True
+        except Exception as e:
+            logger.error(f"Error en eliminar_datos_paciente: {e}")
+            return False
+
 # Instancia global de la base de datos
 db = Database()

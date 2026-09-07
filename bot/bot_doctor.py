@@ -57,7 +57,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/logout - Cerrar sesión\n"
         "/help - Mostrar este mensaje de ayuda\n"
         "/resumen - Obtener el resumen de tus conversaciones\n"
-        "/citas_hoy - Ver las citas programadas para el día de hoy"
+        "/citas_hoy - Ver las citas programadas para el día de hoy\n"
+        "/borrar_paciente <ID> - Borrar todos los datos de un paciente específico"
     )
     if update.message:
         await update.message.reply_text(help_text, parse_mode="Markdown")
@@ -179,7 +180,7 @@ async def get_resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     for r in resumenes:
         cita = r['cita_medica_fecha'].strftime('%Y-%m-%d %H:%M') if r['cita_medica_fecha'] else "Pendiente de asignar"
         icono = "(Abandono)" if r['estado'] == 'CANCELADA' else "(Completado)"
-        respuesta += f"- *Paciente:* {r['paciente_nombre']} (Tel: {r['paciente_telefono']})\n"
+        respuesta += f"- *Paciente:* {r['paciente_nombre']} (Tel: {r['paciente_telefono']} | ID: {r['paciente_telegram_id']})\n"
         respuesta += f"  *Resumen:* {r['resumen']}\n"
         respuesta += f"  *Fecha Registro:* {r['created_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
 
@@ -216,6 +217,35 @@ async def get_citas_hoy_command(update: Update, context: ContextTypes.DEFAULT_TY
     if update.message:
         await update.message.reply_text(respuesta, parse_mode="Markdown")
 
+@require_login
+async def borrar_paciente_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja el comando /borrar_paciente."""
+    if not context.args or len(context.args) != 1:
+        if update.message:
+            await update.message.reply_text(
+                "Uso incorrecto. Debes proporcionar el ID del paciente.\n"
+                "Ejemplo: /borrar_paciente 123456789"
+            )
+        return
+
+    try:
+        paciente_id = int(context.args[0])
+    except ValueError:
+        if update.message:
+            await update.message.reply_text("El ID del paciente debe ser un número entero.")
+        return
+
+    if update.message:
+        await update.message.reply_text(f"Intentando borrar los datos del paciente {paciente_id}...")
+
+    exito = await db.eliminar_datos_paciente(paciente_id)
+    
+    if update.message:
+        if exito:
+            await update.message.reply_text(f"Todos los datos (perfil, conversaciones y mensajes) del paciente {paciente_id} han sido eliminados correctamente.")
+        else:
+            await update.message.reply_text(f"No se ha encontrado un paciente con el ID {paciente_id}.")
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja los errores ocurridos durante la ejecución del bot."""
     logger.error("Excepción ocurrida al procesar una actualización:", exc_info=context.error)
@@ -233,6 +263,7 @@ def create_application(token: str) -> Application:
     # Comandos que requieren login
     application.add_handler(CommandHandler("resumen", get_resumen_command))
     application.add_handler(CommandHandler("citas_hoy", get_citas_hoy_command))
+    application.add_handler(CommandHandler("borrar_paciente", borrar_paciente_command))
 
     # ConversationHandler para login
     login_conv_handler = ConversationHandler(
