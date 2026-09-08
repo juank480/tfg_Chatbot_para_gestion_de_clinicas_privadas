@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import asyncio
+import re
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -228,10 +229,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Detección de Fin de Triage
         terminado = False
         if bot_reply and "[FIN_TOMA_DATOS]" in bot_reply:
-            bot_reply = bot_reply.replace("[FIN_TOMA_DATOS]", "").strip()
+            bot_reply = bot_reply.replace("[FIN_TOMA_DATOS]", "")
             terminado = True
         
         if bot_reply:
+            # Limpiar nuevas líneas extra y posibles puntos sueltos al final generados por el modelo
+            bot_reply = re.sub(r'\n+\s*\.\s*$', '', bot_reply)
+            bot_reply = bot_reply.strip()
+            
             await db.guardar_mensaje(conversacion_id, None, bot_reply)
             await update.message.reply_text(bot_reply)
         
