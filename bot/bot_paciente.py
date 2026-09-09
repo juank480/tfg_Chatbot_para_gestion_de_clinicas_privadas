@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import asyncio
-import re
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -31,9 +30,7 @@ SYSTEM_PROMPT = """Eres un asistente virtual para un doctor en una clínica priv
 Tu objetivo es tomar nota de los síntomas del paciente y ayudar a concertar citas.
 REGLA ESTRICTA: No puedes recetar medicinas ni dar diagnósticos médicos bajo ninguna circunstancia.
 Limítate a preguntar por sus síntomas, tomar sus datos y sugerir que el doctor revisará la información o ayudarles a agendar una visita.
-
-INSTRUCCIÓN CRÍTICA PARA CITAS: NO crees ninguna cita a menos que el paciente te lo pida explícitamente y hayan acordado una fecha y hora. Cuando el paciente solicite agendar la cita, es OBLIGATORIO que utilices la herramienta 'create_appointment'. BAJO NINGÚN CONCEPTO puedes confirmar una cita usando texto normal sin haber invocado la herramienta con éxito. NO INVENTES que has creado una cita.
-
+Si el paciente desea agendar una cita, DEBES utilizar las herramientas proporcionadas (check_availability y create_appointment) para revisar las citas existentes y programar una nueva.
 Sé amable y profesional.
 
 INSTRUCCIÓN CRÍTICA: Cuando consideres que ya tienes todos los síntomas y datos necesarios para el doctor, y se haya terminado de agendar, o el usuario indique que no necesita una cita, despídete del paciente y añade AL FINAL de tu respuesta exactamente este texto: [FIN_TOMA_DATOS]."""
@@ -213,8 +210,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 messages.append({
                     "role": "tool",
-                    "content": tool_result,
-                    "name": function_name
+                    "content": tool_result
                 })
             
             # Volvemos a llamar a Ollama con los resultados de las herramientas
@@ -229,14 +225,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Detección de Fin de Triage
         terminado = False
         if bot_reply and "[FIN_TOMA_DATOS]" in bot_reply:
-            bot_reply = bot_reply.replace("[FIN_TOMA_DATOS]", "")
+            bot_reply = bot_reply.replace("[FIN_TOMA_DATOS]", "").strip()
             terminado = True
         
         if bot_reply:
-            # Limpiar nuevas líneas extra y posibles puntos sueltos al final generados por el modelo
-            bot_reply = re.sub(r'\n+\s*\.\s*$', '', bot_reply)
-            bot_reply = bot_reply.strip()
-            
             await db.guardar_mensaje(conversacion_id, None, bot_reply)
             await update.message.reply_text(bot_reply)
         
