@@ -58,7 +58,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/help - Mostrar este mensaje de ayuda\n"
         "/resumen - Obtener el resumen de tus conversaciones\n"
         "/citas_hoy - Ver las citas programadas para el día de hoy\n"
-        "/borrar_paciente <ID> - Borrar todos los datos de un paciente específico"
+        "/borrar_persona <ID> - Borrar todos los datos de un paciente específico"
     )
     if update.message:
         await update.message.reply_text(help_text, parse_mode="Markdown")
@@ -263,7 +263,7 @@ def create_application(token: str) -> Application:
     # Comandos que requieren login
     application.add_handler(CommandHandler("resumen", get_resumen_command))
     application.add_handler(CommandHandler("citas_hoy", get_citas_hoy_command))
-    application.add_handler(CommandHandler("borrar_paciente", borrar_paciente_command))
+    application.add_handler(CommandHandler("borrar_persona", borrar_paciente_command))
 
     # ConversationHandler para login
     login_conv_handler = ConversationHandler(
